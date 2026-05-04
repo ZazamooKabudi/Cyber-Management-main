@@ -9,6 +9,7 @@ export default defineConfig({
     react(),
   ],
   server: {
+    port: 5160,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
@@ -17,6 +18,7 @@ export default defineConfig({
     },
   },
   preview: {
+    port: 5160,
     host: true,
     proxy: {
       '/api': {
