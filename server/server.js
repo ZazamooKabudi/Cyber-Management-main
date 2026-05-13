@@ -16,6 +16,7 @@ app.use('/api/tasks',     require('./routes/tasks'));
 app.use('/api/systems',   require('./routes/systems'));
 app.use('/api/cves',      require('./routes/cves'));
 app.use('/api/settings',  require('./routes/settings'));
+app.use('/api/config',    require('./routes/config'));
 app.use('/api/analysts',  require('./routes/analysts'));
 app.use('/api/handover',  require('./routes/handover'));
 app.use('/api/events',    require('./routes/events'));

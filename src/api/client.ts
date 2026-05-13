@@ -147,6 +147,18 @@ export const settingsApi = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// App Config (DB path, etc.)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const configApi = {
+  get: () => get<{ db_path: string }>('/config'),
+  setDbPath: (db_path: string) =>
+    put<{ ok: boolean; db_path: string; restartRequired: boolean }>('/config/db-path', { db_path }),
+  copyAndSetDbPath: (db_path: string) =>
+    post<{ ok: boolean; db_path: string; copied: boolean; restartRequired: boolean }>('/config/db-path/copy', { db_path }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Analysts & Shifts
 // ═══════════════════════════════════════════════════════════════════════════
 

@@ -2,8 +2,9 @@
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
+const { getConfig } = require('./config');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'soc.db');
+const DB_PATH = getConfig().db_path;
 let db;
 
 function getDb() {

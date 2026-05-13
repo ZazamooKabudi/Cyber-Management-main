@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Settings as SettingsIcon, Palette, Bell, Rss, Shield, Database, List, Pencil, Trash2, Plus, Check, X, Activity, Filter, BookOpen, GripVertical, Mail, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Bell, Rss, Shield, Database, List, Pencil, Trash2, Plus, Check, X, Activity, Filter, BookOpen, GripVertical, Mail, Eye, EyeOff, FolderOpen, AlertTriangle, Copy } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useAppStore } from '../store/appStore';
 import { useListsStore, type ListName } from '../store/listsStore';
 import { usePlaybooksStore } from '../store/playbooksStore';
-import { settingsApi, usersApi, incidentsApi, tasksApi, systemsApi, cvesApi } from '../api/client';
+import { settingsApi, usersApi, incidentsApi, tasksApi, systemsApi, cvesApi, configApi } from '../api/client';
 import type { Theme, TickerMessage, ActivityLog, User, PlaybookItem } from '../types';
 import { format } from 'date-fns';
 
@@ -57,6 +57,13 @@ export function Settings() {
     smtp_host: '', smtp_port: '587', smtp_user: '', smtp_password: '',
     smtp_from_address: '', smtp_from_name: 'SOC System', smtp_tls: 'true', smtp_relay_url: '',
   });
+
+  // Data tab — DB path config
+  const [dbPath, setDbPath] = useState('');
+  const [dbPathInput, setDbPathInput] = useState('');
+  const [dbPathStatus, setDbPathStatus] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [dbPathError, setDbPathError] = useState('');
+  const [dbPathRestartNeeded, setDbPathRestartNeeded] = useState(false);
 
   // Playbooks tab state
   const [pbSelected, setPbSelected] = useState<number | null>(null);
@@ -145,6 +152,7 @@ export function Settings() {
       });
     });
     settingsApi.getTicker().then(msgs => setTickerMessages(msgs.sort((a, b) => a.order - b.order)));
+    configApi.get().then(cfg => { setDbPath(cfg.db_path); setDbPathInput(cfg.db_path); }).catch(() => {});
   }, []);
 
   const saveSetting = async (key: string, value: string) => {
@@ -258,6 +266,24 @@ export function Settings() {
     a.download = `soc-backup-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSaveDbPath = async (copyDb = false) => {
+    setDbPathStatus('idle');
+    setDbPathError('');
+    try {
+      const result = copyDb
+        ? await configApi.copyAndSetDbPath(dbPathInput)
+        : await configApi.setDbPath(dbPathInput);
+      setDbPath(result.db_path);
+      setDbPathInput(result.db_path);
+      setDbPathStatus('saved');
+      setDbPathRestartNeeded(result.restartRequired);
+      setTimeout(() => setDbPathStatus('idle'), 3000);
+    } catch (e: any) {
+      setDbPathStatus('error');
+      setDbPathError(e.message || 'שגיאה בשמירה');
+    }
   };
 
   return (
@@ -838,16 +864,86 @@ export function Settings() {
           )}
 
           {activeTab === 'data' && (
-            <Card title="גיבוי ונתונים">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ padding: '16px', background: 'var(--bg-hover)', borderRadius: '10px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  ייצוא הנתונים כולל: אירועים, משימות, מערכות, CVEs, ומשתמשים בפורמט JSON.
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <Card title="מיקום מסד הנתונים">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ padding: '12px 16px', background: 'var(--bg-hover)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>נתיב נוכחי: </span>
+                    <span style={{ fontFamily: 'monospace', direction: 'ltr', display: 'inline-block' }}>{dbPath || '...'}</span>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      נתיב חדש לקובץ ה-DB
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <FolderOpen size={16} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                      <input
+                        value={dbPathInput}
+                        onChange={e => setDbPathInput(e.target.value)}
+                        placeholder="C:\SQL_DB\Cyber-Management-main\soc.db"
+                        dir="ltr"
+                        style={{
+                          flex: 1, padding: '8px 12px', background: 'var(--bg-hover)',
+                          border: '1px solid var(--border)', borderRadius: '6px',
+                          color: 'var(--text-primary)', fontSize: '13px', fontFamily: 'monospace',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <Button
+                      variant="primary"
+                      icon={<Check size={14} />}
+                      onClick={() => handleSaveDbPath(false)}
+                      disabled={dbPathInput === dbPath || !dbPathInput.trim()}
+                    >
+                      שמור נתיב
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      icon={<Copy size={14} />}
+                      onClick={() => handleSaveDbPath(true)}
+                      disabled={dbPathInput === dbPath || !dbPathInput.trim()}
+                    >
+                      העתק DB לנתיב החדש ושמור
+                    </Button>
+                  </div>
+
+                  {dbPathStatus === 'saved' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(0,200,100,0.1)', border: '1px solid rgba(0,200,100,0.3)', borderRadius: '8px', fontSize: '13px', color: '#00c864' }}>
+                      <Check size={14} />
+                      הנתיב נשמר בהצלחה
+                    </div>
+                  )}
+                  {dbPathStatus === 'error' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)', borderRadius: '8px', fontSize: '13px', color: '#ff5050' }}>
+                      <X size={14} />
+                      {dbPathError}
+                    </div>
+                  )}
+                  {dbPathRestartNeeded && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(255,170,0,0.1)', border: '1px solid rgba(255,170,0,0.35)', borderRadius: '8px', fontSize: '13px', color: '#ffaa00' }}>
+                      <AlertTriangle size={14} />
+                      <span>יש להפעיל מחדש את השרת כדי שהשינוי ייכנס לתוקף</span>
+                    </div>
+                  )}
                 </div>
-                <Button variant="primary" icon={<Database size={14} />} onClick={handleExportDB}>
-                  ייצוא נתונים (JSON)
-                </Button>
-              </div>
-            </Card>
+              </Card>
+
+              <Card title="גיבוי ונתונים">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ padding: '16px', background: 'var(--bg-hover)', borderRadius: '10px', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                    ייצוא הנתונים כולל: אירועים, משימות, מערכות, CVEs, ומשתמשים בפורמט JSON.
+                  </div>
+                  <Button variant="primary" icon={<Database size={14} />} onClick={handleExportDB}>
+                    ייצוא נתונים (JSON)
+                  </Button>
+                </div>
+              </Card>
+            </div>
           )}
         </div>
       </div>
